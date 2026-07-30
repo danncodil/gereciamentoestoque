@@ -73,6 +73,7 @@ body {
         var(--bg);
     color: var(--text);
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
 button,
@@ -1619,6 +1620,10 @@ select:disabled {
 }
 
 @media (max-width: 860px) {
+    .app-layout {
+        overflow-x: clip;
+    }
+
     .sidebar {
         position: fixed;
         inset: 0 auto 0 0;
@@ -1626,10 +1631,14 @@ select:disabled {
         width: min(88vw, 320px);
         z-index: 1100;
         transition: transform 0.25s ease;
+        visibility: hidden;
+        pointer-events: none;
     }
 
     .sidebar.open {
         transform: translateX(0);
+        visibility: visible;
+        pointer-events: auto;
     }
 
     .sidebar-close,
@@ -1643,7 +1652,38 @@ select:disabled {
     }
 
     .top-header {
+        flex-direction: column;
         align-items: flex-start;
+        padding: 1rem;
+        gap: 0.85rem;
+    }
+
+    .top-header h1 {
+        font-size: clamp(1.55rem, 7vw, 2rem);
+        line-height: 1.08;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+    }
+
+    .icon-btn,
+    .theme-toggle-btn,
+    .hamburger {
+        width: 42px;
+        height: 42px;
+    }
+
+    .user-profile {
+        min-width: 0;
+        margin-left: auto;
+    }
+
+    .user-name {
+        font-size: 0.88rem;
     }
 
     .chart-header {
@@ -1660,6 +1700,21 @@ select:disabled {
     .quick-actions-buttons .btn-secondary {
         width: 100%;
         min-width: 0;
+    }
+
+    .dashboard-intro-actions,
+    .section-actions-inline,
+    .card-inline-actions {
+        width: 100%;
+    }
+
+    .dashboard-intro-actions .btn-primary,
+    .dashboard-intro-actions .btn-secondary,
+    .section-actions-inline .btn-primary,
+    .section-actions-inline .btn-secondary,
+    .card-inline-actions .btn-primary,
+    .card-inline-actions .btn-secondary {
+        width: 100%;
     }
 
     .stats-grid,
@@ -1685,6 +1740,76 @@ select:disabled {
 
     .text-right {
         text-align: left;
+    }
+}
+
+@media (max-width: 560px) {
+    .card,
+    .stat-card {
+        padding: 1rem;
+    }
+
+    .sidebar {
+        width: min(92vw, 320px);
+    }
+
+    .sidebar-brand {
+        gap: 0.75rem;
+        margin-bottom: 1.4rem;
+    }
+
+    .brand-icon {
+        width: 48px;
+        height: 48px;
+        padding: 8px;
+    }
+
+    .sidebar-brand h2.brand-name {
+        font-size: 1.12rem;
+    }
+
+    .top-header p,
+    .dashboard-intro-copy p {
+        line-height: 1.5;
+    }
+
+    .dashboard-intro-copy h1 {
+        font-size: clamp(1.25rem, 8vw, 1.7rem);
+    }
+
+    .header-actions {
+        align-items: center;
+    }
+
+    .user-name,
+    .user-chevron {
+        display: none;
+    }
+
+    .user-profile {
+        padding: 0.35rem;
+        width: 42px;
+        height: 42px;
+        justify-content: center;
+        border-radius: 12px;
+    }
+
+    .user-avatar {
+        width: 28px;
+        height: 28px;
+    }
+
+    .brand-kicker {
+        font-size: 0.7rem;
+        letter-spacing: 0.09em;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    .modal-content {
+        width: 100%;
     }
 }
 
