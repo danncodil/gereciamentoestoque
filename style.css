@@ -532,6 +532,12 @@ button {
     margin-top: 1rem;
 }
 
+.inventory-actions-inline {
+    justify-content: flex-end;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
 .card-inline-actions {
     justify-content: flex-end;
 }
