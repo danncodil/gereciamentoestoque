@@ -3,6 +3,7 @@ const STORAGE_KEYS = {
     historico: 'meuEstoqueHistoricoV10',
     tema: 'temaEstoqueV10',
     categoria: 'estoqueCategoriaAtualV10',
+    secao: 'estoqueSecaoAtivaV10',
     catalogo: 'meuEstoqueCatalogoV10'
 };
 
@@ -110,6 +111,13 @@ let categoriaAtual = 'todos';
 let ordemAtual = { coluna: 'nome', direcao: 'asc' };
 let produtoAtualIndex = null;
 let editandoIndex = null;
+let secaoAtiva = 'sec-dashboard';
+
+function classeStatusParaFiltro(classeStatus = '') {
+    if (classeStatus.includes('critico')) return 'critico';
+    if (classeStatus.includes('atencao')) return 'atencao';
+    return 'ok';
+}
 
 function criarIdProduto(nome = '') {
     return String(nome)
@@ -179,6 +187,7 @@ function salvarDados() {
     localStorage.setItem(STORAGE_KEYS.estoque, JSON.stringify(estoque));
     localStorage.setItem(STORAGE_KEYS.historico, JSON.stringify(historico));
     localStorage.setItem(STORAGE_KEYS.categoria, categoriaAtual);
+    localStorage.setItem(STORAGE_KEYS.secao, secaoAtiva);
 }
 
 function carregarDados() {
@@ -200,6 +209,7 @@ function carregarDados() {
             : [];
 
         categoriaAtual = localStorage.getItem(STORAGE_KEYS.categoria) || 'todos';
+        secaoAtiva = localStorage.getItem(STORAGE_KEYS.secao) || 'sec-dashboard';
 
         if (!catalogoSalvo) {
             salvarDados();
@@ -246,6 +256,41 @@ function mostrarToast(mensagem, tipo = 'info', duracao = 4000) {
 
 function obterStatusProduto(produto) {
     const total = normalizarNumero(produto.totalEstoque);
+
+    function renderizarHistorico() {
+        const tbody = document.getElementById('lista-historico');
+        if (!tbody) return;
+
+        tbody.replaceChildren();
+
+        if (historico.length === 0) {
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 2;
+            td.style.textAlign = 'center';
+            td.style.color = 'var(--text-muted)';
+            td.style.padding = '2rem';
+            td.textContent = 'Nenhuma alteração registrada.';
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+            return;
+        }
+
+        historico.forEach(item => {
+            const tr = document.createElement('tr');
+
+            const tdData = document.createElement('td');
+            tdData.style.whiteSpace = 'nowrap';
+            tdData.style.color = 'var(--text-muted)';
+            tdData.textContent = item.data || '-';
+
+            const tdDescricao = document.createElement('td');
+            tdDescricao.textContent = item.descricao || '-';
+
+            tr.append(tdData, tdDescricao);
+            tbody.appendChild(tr);
+        });
+    }
     const min = normalizarNumero(produto.min);
 
     if (total <= min) {
@@ -303,6 +348,75 @@ function calcularResultadoContagem(produto, caixas, avulsos) {
     return { totalMedida, unidadesFisicas, pesoAproximadoKg };
 }
 
+function calcularReposicaoProduto(produto) {
+    const total = normalizarNumero(produto.totalEstoque);
+    const min = normalizarNumero(produto.min);
+    const reposicao = Math.max(0, min - total);
+
+    return {
+        total,
+        min,
+        reposicao,
+        precisaReposicao: reposicao > 0
+    };
+}
+
+function obterItensCompraSugerida() {
+    return estoque
+        .map(produto => ({
+            ...produto,
+            ...calcularReposicaoProduto(produto)
+        }))
+        .filter(item => item.precisaReposicao)
+        .sort((a, b) => {
+            const prioridadeA = obterStatusProduto(a).peso;
+            const prioridadeB = obterStatusProduto(b).peso;
+
+            if (prioridadeA !== prioridadeB) {
+                return prioridadeA - prioridadeB;
+            }
+
+            if (b.reposicao !== a.reposicao) {
+                return b.reposicao - a.reposicao;
+            }
+
+            return a.nome.localeCompare(b.nome, 'pt-BR');
+        });
+}
+
+function escapaCsv(valor) {
+    return `"${String(valor ?? '').replaceAll('"', '""')}"`;
+}
+
+function baixarArquivo(conteudo, nomeArquivo, tipoMime) {
+    const blob = new Blob([conteudo], { type: tipoMime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = nomeArquivo;
+    link.click();
+
+    URL.revokeObjectURL(url);
+}
+
+function atualizarSecaoAtiva(secaoId) {
+    const secoes = document.querySelectorAll('.app-section');
+    const botaoAtivo = document.querySelector(`.nav-item[data-target="${secaoId}"]`);
+
+    secaoAtiva = secaoId;
+
+    secoes.forEach(secao => {
+        secao.classList.toggle('active', secao.id === secaoId);
+    });
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item === botaoAtivo);
+    });
+
+    localStorage.setItem(STORAGE_KEYS.secao, secaoAtiva);
+}
+
 function alternarModal(id, aberto) {
     const modal = document.getElementById(id);
     if (!modal) return;
@@ -315,6 +429,202 @@ function alternarModal(id, aberto) {
 function atualizarTabsAtivas() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.category === categoriaAtual);
+    });
+}
+
+function atualizarResumoOperacional() {
+    const pesoTotal = estoque.reduce((acc, item) => acc + calcularPesoAproximadoProduto(item), 0);
+    const categoriasAtivas = new Set(estoque.map(item => item.categoria)).size;
+    const ultimaAtualizacao = historico[0]?.data || 'Sem registros';
+
+    const pesoEl = document.getElementById('stat-peso-total');
+    const categoriasEl = document.getElementById('stat-categorias-ativas');
+    const ultimaEl = document.getElementById('stat-ultima-atualizacao');
+
+    if (pesoEl) pesoEl.textContent = formatarPesoKg(pesoTotal);
+    if (categoriasEl) categoriasEl.textContent = String(categoriasAtivas);
+    if (ultimaEl) ultimaEl.textContent = ultimaAtualizacao;
+}
+
+function renderizarGraficoOperacional() {
+    const container = document.getElementById('operational-chart-wrap');
+    if (!container) return;
+
+    const dias = [];
+    const hoje = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const data = new Date(hoje);
+        data.setDate(data.getDate() - i);
+        dias.push(data);
+    }
+
+    const chaveDia = data => `${data.getFullYear()}-${data.getMonth()}-${data.getDate()}`;
+    const serieSaidas = new Map(dias.map(data => [chaveDia(data), 0]));
+    const serieReposicao = new Map(dias.map(data => [chaveDia(data), 0]));
+
+    historico.forEach(item => {
+        const match = String(item.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (!match) return;
+
+        const [, diaStr, mesStr, anoStr] = match;
+        const chave = `${Number(anoStr)}-${Number(mesStr) - 1}-${Number(diaStr)}`;
+        // aproximação: remoções contam como saída, demais ações como reabastecimento
+        if (item.descricao?.startsWith('Removeu')) {
+            if (serieSaidas.has(chave)) serieSaidas.set(chave, serieSaidas.get(chave) + 1);
+        } else if (serieReposicao.has(chave)) {
+            serieReposicao.set(chave, serieReposicao.get(chave) + 1);
+        }
+    });
+
+    const eixoMax = 10;
+    const largura = 100;
+    const altura = 34;
+    const passo = largura / (dias.length - 1);
+
+    const pontosParaPath = serie => dias.map((data, i) => {
+        const valor = Math.min(serie.get(chaveDia(data)) ?? 0, eixoMax);
+        const x = i * passo;
+        const y = altura - (valor / eixoMax) * altura;
+        return `${x},${y}`;
+    });
+
+    const pathReposicao = pontosParaPath(serieReposicao);
+    const pathSaidas = pontosParaPath(serieSaidas);
+    const labels = dias.map(data => data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }));
+
+    container.innerHTML = `
+        <svg viewBox="0 -2 ${largura} ${altura + 14}" preserveAspectRatio="none" class="operational-chart-svg" role="img" aria-label="Vendas vs reabastecimento nos últimos 7 dias">
+            <line x1="0" y1="${altura}" x2="${largura}" y2="${altura}" class="chart-axis" />
+            <line x1="0" y1="${altura / 2}" x2="${largura}" y2="${altura / 2}" class="chart-axis chart-axis-mid" />
+            <polyline points="${pathReposicao.join(' ')}" class="chart-line chart-line-primary" />
+            <polyline points="${pathSaidas.join(' ')}" class="chart-line chart-line-secondary" />
+        </svg>
+        <div class="operational-chart-labels">${labels.map(rotulo => `<span>${rotulo}</span>`).join('')}</div>
+        <div class="operational-chart-legend">
+            <span class="legend-dot legend-primary"></span> Reabastecimento
+            <span class="legend-dot legend-secondary"></span> Vendas
+        </div>
+    `;
+}
+
+function renderizarGraficosDashboard() {
+    const donut = document.getElementById('status-donut');
+    const legenda = document.getElementById('status-legend');
+    const barras = document.getElementById('category-bars');
+
+    if (!donut || !legenda || !barras) return;
+
+    const contagemStatus = { ok: 0, atencao: 0, critico: 0 };
+    estoque.forEach(produto => {
+        const tipoStatus = classeStatusParaFiltro(obterStatusProduto(produto).classe);
+        contagemStatus[tipoStatus] += 1;
+    });
+
+    const totalItens = estoque.length;
+    const divisor = totalItens > 0 ? totalItens : 1;
+
+    const porcentagemOk = (contagemStatus.ok / divisor) * 100;
+    const porcentagemAtencao = (contagemStatus.atencao / divisor) * 100;
+    const porcentagemCritico = (contagemStatus.critico / divisor) * 100;
+
+    donut.style.setProperty('--ok', porcentagemOk.toFixed(2));
+    donut.style.setProperty('--atencao', porcentagemAtencao.toFixed(2));
+    donut.style.setProperty('--critico', porcentagemCritico.toFixed(2));
+    donut.setAttribute('data-total', String(totalItens));
+
+    legenda.replaceChildren();
+    [
+        { chave: 'ok', label: 'OK' },
+        { chave: 'atencao', label: 'Atenção' },
+        { chave: 'critico', label: 'Crítico' }
+    ].forEach(item => {
+        const linha = document.createElement('div');
+        linha.className = 'legend-item';
+
+        const esquerda = document.createElement('div');
+        esquerda.className = 'legend-left';
+
+        const dot = document.createElement('span');
+        dot.className = `legend-dot ${item.chave}`;
+
+        const texto = document.createElement('span');
+        texto.textContent = item.label;
+
+        esquerda.append(dot, texto);
+
+        const valor = document.createElement('span');
+        valor.className = 'legend-value';
+        valor.textContent = `${contagemStatus[item.chave]} item(ns)`;
+
+        linha.append(esquerda, valor);
+        legenda.appendChild(linha);
+    });
+
+    barras.replaceChildren();
+    const totaisCategoria = CATEGORIAS.map(categoria => ({
+        categoria,
+        total: estoque.filter(item => item.categoria === categoria).length
+    }));
+
+    const maiorTotal = totaisCategoria.reduce((max, item) => Math.max(max, item.total), 1);
+
+    totaisCategoria.forEach(item => {
+        const linha = document.createElement('div');
+        linha.className = 'category-bar-row';
+
+        const label = document.createElement('span');
+        label.className = 'category-bar-label';
+        label.textContent = CATEGORIAS_LABEL[item.categoria];
+
+        const trilho = document.createElement('div');
+        trilho.className = 'category-bar-track';
+
+        const barra = document.createElement('div');
+        barra.className = 'category-bar-fill';
+        barra.style.width = `${(item.total / maiorTotal) * 100}%`;
+        trilho.appendChild(barra);
+
+        const valor = document.createElement('span');
+        valor.className = 'category-bar-value';
+        valor.textContent = `${item.total} item(ns)`;
+
+        linha.append(label, trilho, valor);
+        barras.appendChild(linha);
+    });
+}
+
+function renderizarHistorico() {
+    const tbody = document.getElementById('lista-historico');
+    if (!tbody) return;
+
+    tbody.replaceChildren();
+
+    if (historico.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 2;
+        td.style.textAlign = 'center';
+        td.style.color = 'var(--text-muted)';
+        td.style.padding = '2rem';
+        td.textContent = 'Nenhuma alteração registrada.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+    }
+
+    historico.forEach(item => {
+        const tr = document.createElement('tr');
+
+        const tdData = document.createElement('td');
+        tdData.style.whiteSpace = 'nowrap';
+        tdData.style.color = 'var(--text-muted)';
+        tdData.textContent = item.data || '-';
+
+        const tdDescricao = document.createElement('td');
+        tdDescricao.textContent = item.descricao || '-';
+
+        tr.append(tdData, tdDescricao);
+        tbody.appendChild(tr);
     });
 }
 
@@ -374,6 +684,16 @@ function renderizarCategorias() {
 
     container.replaceChildren();
 
+    const temItens = estoque.length > 0;
+
+    if (!temItens) {
+        const vazio = document.createElement('div');
+        vazio.className = 'empty-state-panel';
+        vazio.textContent = 'Sem itens no inventário ainda. Adicione produtos para ver o resumo por categoria.';
+        container.appendChild(vazio);
+        return;
+    }
+
     CATEGORIAS.forEach(categoria => {
         const itens = estoque.filter(item => item.categoria === categoria);
         const criticos = itens.filter(item => normalizarNumero(item.totalEstoque) <= normalizarNumero(item.min)).length;
@@ -412,6 +732,11 @@ function criarBotaoAcao(texto, classes, titulo, onClick) {
 function renderizarTabela() {
     const tbody = document.getElementById('lista-estoque');
     const busca = (document.getElementById('input-busca')?.value || '').toLowerCase().trim();
+    const filtroStatus = document.getElementById('filtro-status')?.value || 'todos';
+    const valorFiltroMin = String(document.getElementById('filtro-estoque-min')?.value || '').trim();
+    const valorFiltroMax = String(document.getElementById('filtro-estoque-max')?.value || '').trim();
+    const filtroEstoqueMin = valorFiltroMin === '' ? NaN : normalizarNumero(valorFiltroMin, NaN);
+    const filtroEstoqueMax = valorFiltroMax === '' ? NaN : normalizarNumero(valorFiltroMax, NaN);
     if (!tbody) return;
 
     tbody.replaceChildren();
@@ -422,7 +747,12 @@ function renderizarTabela() {
     let produtosFiltrados = estoque.filter(produto => {
         const categoriaOk = categoriaAtual === 'todos' || produto.categoria === categoriaAtual;
         const buscaOk = produto.nome.toLowerCase().includes(busca);
-        return categoriaOk && buscaOk;
+        const statusProduto = classeStatusParaFiltro(obterStatusProduto(produto).classe);
+        const statusOk = filtroStatus === 'todos' || filtroStatus === statusProduto;
+        const totalAtual = normalizarNumero(produto.totalEstoque);
+        const faixaMinOk = Number.isNaN(filtroEstoqueMin) || totalAtual >= filtroEstoqueMin;
+        const faixaMaxOk = Number.isNaN(filtroEstoqueMax) || totalAtual <= filtroEstoqueMax;
+        return categoriaOk && buscaOk && statusOk && faixaMinOk && faixaMaxOk;
     });
 
     if (ordemAtual.coluna) {
@@ -469,6 +799,7 @@ function renderizarTabela() {
         const tr = document.createElement('tr');
 
         const tdNome = document.createElement('td');
+        tdNome.setAttribute('data-label', 'Produto');
         const nomeStrong = document.createElement('strong');
         nomeStrong.textContent = produto.nome;
         const meta = document.createElement('div');
@@ -477,24 +808,30 @@ function renderizarTabela() {
         tdNome.append(nomeStrong, meta);
 
         const tdEmbalagem = document.createElement('td');
+        tdEmbalagem.setAttribute('data-label', 'Embalagem');
         tdEmbalagem.textContent = `${formatarNumero(produto.qtdCaixa)} por caixa • ${formatarNumero(produto.medidaItem)} ${produto.unidade} por item`;
 
         const tdContagem = document.createElement('td');
+        tdContagem.setAttribute('data-label', 'Contagem');
         tdContagem.textContent = `${formatarNumero(decomposicao.caixasCheias)} cx + ${formatarNumero(decomposicao.avulsos)} un`;
 
         const tdEstoque = document.createElement('td');
+        tdEstoque.setAttribute('data-label', 'Total calculado');
         tdEstoque.innerHTML = `<strong>${formatarNumero(total)} ${produto.unidade}</strong>`;
 
         const tdPeso = document.createElement('td');
+        tdPeso.setAttribute('data-label', 'Peso aprox.');
         tdPeso.textContent = formatarPesoKg(pesoAprox);
 
         const tdStatus = document.createElement('td');
+        tdStatus.setAttribute('data-label', 'Status');
         const badge = document.createElement('span');
         badge.className = `status-badge ${status.classe}`;
         badge.textContent = status.texto;
         tdStatus.appendChild(badge);
 
         const tdAcoes = document.createElement('td');
+        tdAcoes.setAttribute('data-label', 'Ações');
         tdAcoes.className = 'text-right';
         tdAcoes.append(
             criarBotaoAcao('⏱️', 'btn-acao btn-contar', `Contar ${produto.nome}`, () => abrirModal(indexReal)),
@@ -508,10 +845,20 @@ function renderizarTabela() {
 
     document.getElementById('stat-total').textContent = String(totalItens);
     document.getElementById('stat-baixo').textContent = String(itensBaixo);
+    const statCompras = document.getElementById('stat-compras');
+    if (statCompras) statCompras.textContent = String(obterItensCompraSugerida().length);
     document.getElementById('stat-catalogo').textContent = String(catalogoProdutos.length);
     document.getElementById('table-count').textContent = `Mostrando ${produtosFiltrados.length} produto(s)`;
 
+    const notifDot = document.getElementById('notification-dot');
+    if (notifDot) notifDot.hidden = itensBaixo === 0;
+
     renderizarCategorias();
+    renderizarGraficosDashboard();
+    renderizarComprasSugeridas();
+    renderizarAtividadeRecente();
+    atualizarResumoOperacional();
+    renderizarGraficoOperacional();
     atualizarTabsAtivas();
 }
 
@@ -550,6 +897,141 @@ function renderizarHistorico() {
     });
 }
 
+function renderizarComprasSugeridas() {
+    const lista = obterItensCompraSugerida();
+    const tbody = document.getElementById('lista-compras');
+    const preview = document.getElementById('dashboard-purchases-preview');
+    const totalProdutos = document.getElementById('stat-repor');
+    const totalQuantidade = document.getElementById('stat-quantidade-repor');
+    const totalCategorias = document.getElementById('stat-categorias-repor');
+
+    const totalReposicao = lista.reduce((acc, item) => acc + item.reposicao, 0);
+    const categoriasAfetadas = new Set(lista.map(item => item.categoria)).size;
+
+    if (totalProdutos) totalProdutos.textContent = String(lista.length);
+    if (totalQuantidade) totalQuantidade.textContent = formatarNumero(totalReposicao);
+    if (totalCategorias) totalCategorias.textContent = String(categoriasAfetadas);
+
+    if (tbody) {
+        tbody.replaceChildren();
+
+        if (!lista.length) {
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 7;
+            td.style.textAlign = 'center';
+            td.style.color = 'var(--text-muted)';
+            td.style.padding = '2rem';
+            td.textContent = 'Nenhuma compra sugerida no momento.';
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+        } else {
+            lista.forEach(produto => {
+                const tr = document.createElement('tr');
+                const status = obterStatusProduto(produto);
+                const indiceReal = estoque.findIndex(item => item.id === produto.id);
+
+                const tdNome = document.createElement('td');
+                tdNome.setAttribute('data-label', 'Produto');
+                tdNome.innerHTML = `<strong>${produto.nome}</strong>`;
+
+                const tdCategoria = document.createElement('td');
+                tdCategoria.setAttribute('data-label', 'Categoria');
+                tdCategoria.textContent = CATEGORIAS_LABEL[produto.categoria];
+
+                const tdAtual = document.createElement('td');
+                tdAtual.setAttribute('data-label', 'Atual');
+                tdAtual.textContent = `${formatarNumero(produto.total)} ${produto.unidade}`;
+
+                const tdMin = document.createElement('td');
+                tdMin.setAttribute('data-label', 'Mínimo');
+                tdMin.textContent = `${formatarNumero(produto.min)} ${produto.unidade}`;
+
+                const tdComprar = document.createElement('td');
+                tdComprar.setAttribute('data-label', 'Comprar');
+                tdComprar.innerHTML = `<strong>${formatarNumero(produto.reposicao)} ${produto.unidade}</strong>`;
+
+                const tdStatus = document.createElement('td');
+                tdStatus.setAttribute('data-label', 'Status');
+                const badge = document.createElement('span');
+                badge.className = `status-badge ${status.classe}`;
+                badge.textContent = status.texto;
+                tdStatus.appendChild(badge);
+
+                const tdAcoes = document.createElement('td');
+                tdAcoes.setAttribute('data-label', 'Ações');
+                tdAcoes.className = 'text-right';
+                tdAcoes.append(
+                    criarBotaoAcao('⏱️', 'btn-acao btn-contar', `Contar ${produto.nome}`, () => abrirModal(indiceReal)),
+                    criarBotaoAcao('⚙️', 'btn-acao', `Editar ${produto.nome}`, () => abrirModalEdicao(indiceReal))
+                );
+
+                tr.append(tdNome, tdCategoria, tdAtual, tdMin, tdComprar, tdStatus, tdAcoes);
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    if (preview) {
+        preview.replaceChildren();
+
+        if (!lista.length) {
+            const vazio = document.createElement('div');
+            vazio.className = 'suggested-empty';
+            vazio.textContent = 'Tudo em dia. Não há itens para comprar agora.';
+            preview.appendChild(vazio);
+            return;
+        }
+
+        lista.slice(0, 4).forEach(produto => {
+            const item = document.createElement('div');
+            item.className = 'suggested-item';
+
+            const meta = document.createElement('div');
+            meta.className = 'suggested-item-meta';
+            meta.innerHTML = `<strong>${produto.nome}</strong><span>${CATEGORIAS_LABEL[produto.categoria]}</span>`;
+
+            const compra = document.createElement('div');
+            compra.className = 'suggested-item-buy';
+            compra.textContent = `Comprar ${formatarNumero(produto.reposicao)} ${produto.unidade}`;
+
+            item.append(meta, compra);
+            preview.appendChild(item);
+        });
+    }
+}
+
+function renderizarAtividadeRecente() {
+    const container = document.getElementById('recent-activity');
+    if (!container) return;
+
+    container.replaceChildren();
+
+    const recentes = historico.slice(0, 5);
+
+    if (!recentes.length) {
+        const vazio = document.createElement('div');
+        vazio.className = 'recent-activity-empty';
+        vazio.textContent = 'Sem movimentações recentes. As ações feitas no inventário vão aparecer aqui.';
+        container.appendChild(vazio);
+        return;
+    }
+
+    recentes.forEach(item => {
+        const bloco = document.createElement('div');
+        bloco.className = 'recent-activity-item';
+
+        const data = document.createElement('strong');
+        data.textContent = item.data || '-';
+
+        const descricao = document.createElement('p');
+        descricao.textContent = item.descricao || '-';
+
+        bloco.append(data, descricao);
+        container.appendChild(bloco);
+    });
+}
+
 function verificarCriticos() {
     const criticos = estoque.filter(item => normalizarNumero(item.totalEstoque) <= normalizarNumero(item.min));
     if (!criticos.length) return;
@@ -561,6 +1043,22 @@ function verificarCriticos() {
 
 function filtrarCategoria(categoria) {
     categoriaAtual = categoria;
+    salvarDados();
+    renderizarTabela();
+}
+
+function limparFiltros() {
+    const inputBusca = document.getElementById('input-busca');
+    const selectStatus = document.getElementById('filtro-status');
+    const filtroEstoqueMin = document.getElementById('filtro-estoque-min');
+    const filtroEstoqueMax = document.getElementById('filtro-estoque-max');
+
+    if (inputBusca) inputBusca.value = '';
+    if (selectStatus) selectStatus.value = 'todos';
+    if (filtroEstoqueMin) filtroEstoqueMin.value = '';
+    if (filtroEstoqueMax) filtroEstoqueMax.value = '';
+
+    categoriaAtual = 'todos';
     salvarDados();
     renderizarTabela();
 }
@@ -678,7 +1176,7 @@ function removerProduto(index) {
     const produto = estoque[index];
     if (!produto) return;
 
-    if (!window.confirm(`Remover "${produto.nome}" do inventário?`)) return;
+    if (!window.confirm(`Tem certeza que deseja remover "${produto.nome}" do inventário? Essa ação não pode ser desfeita.`)) return;
 
     estoque.splice(index, 1);
     registrarHistorico(`Removeu do inventário: ${produto.nome}`);
@@ -697,17 +1195,49 @@ function exportarDados() {
         historico
     };
 
-    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
     const dataArquivo = new Date().toLocaleDateString('pt-BR').replaceAll('/', '-');
 
-    link.href = url;
-    link.download = `estoque-backup-${dataArquivo}.json`;
-    link.click();
-
-    URL.revokeObjectURL(url);
+    baixarArquivo(JSON.stringify(dados, null, 2), `order2stock-backup-${dataArquivo}.json`, 'application/json');
     mostrarToast('Backup exportado.', 'success');
+}
+
+function exportarCSVInventario() {
+    const cabecalho = ['Produto', 'Categoria', 'QtdCaixa', 'MedidaItem', 'Unidade', 'PesoCaixaKg', 'Minimo', 'TotalEstoque', 'Status'];
+    const linhas = estoque.map(produto => {
+        const status = obterStatusProduto(produto).texto;
+        return [
+            escapaCsv(produto.nome),
+            escapaCsv(CATEGORIAS_LABEL[produto.categoria]),
+            escapaCsv(formatarNumero(produto.qtdCaixa)),
+            escapaCsv(formatarNumero(produto.medidaItem)),
+            escapaCsv(produto.unidade),
+            escapaCsv(formatarNumero(produto.pesoCaixaKg)),
+            escapaCsv(formatarNumero(produto.min)),
+            escapaCsv(formatarNumero(produto.totalEstoque)),
+            escapaCsv(status)
+        ].join(';');
+    });
+
+    const dataArquivo = new Date().toLocaleDateString('pt-BR').replaceAll('/', '-');
+    baixarArquivo([cabecalho.join(';'), ...linhas].join('\n'), `order2stock-inventario-${dataArquivo}.csv`, 'text/csv;charset=utf-8');
+    mostrarToast('Inventário exportado em CSV.', 'success');
+}
+
+function exportarCSVSugeridos() {
+    const lista = obterItensCompraSugerida();
+    const cabecalho = ['Produto', 'Categoria', 'Atual', 'Minimo', 'Comprar', 'Unidade'];
+    const linhas = lista.map(produto => [
+        escapaCsv(produto.nome),
+        escapaCsv(CATEGORIAS_LABEL[produto.categoria]),
+        escapaCsv(formatarNumero(produto.total)),
+        escapaCsv(formatarNumero(produto.min)),
+        escapaCsv(formatarNumero(produto.reposicao)),
+        escapaCsv(produto.unidade)
+    ].join(';'));
+
+    const dataArquivo = new Date().toLocaleDateString('pt-BR').replaceAll('/', '-');
+    baixarArquivo([cabecalho.join(';'), ...linhas].join('\n'), `order2stock-compras-sugeridas-${dataArquivo}.csv`, 'text/csv;charset=utf-8');
+    mostrarToast('Compras sugeridas exportadas em CSV.', 'success');
 }
 
 function importarDados(event) {
@@ -724,7 +1254,7 @@ function importarDados(event) {
                 return;
             }
 
-            if (!window.confirm('Substituir catálogo, inventário e histórico pelos dados importados?')) {
+            if (!window.confirm('A importação vai substituir catálogo, inventário e histórico atuais. Deseja continuar?')) {
                 return;
             }
 
@@ -762,20 +1292,62 @@ function limparHistorico() {
     mostrarToast('Histórico limpo.', 'success');
 }
 
-function navegarPara(secaoId, botao) {
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-    botao.classList.add('active');
-
+function navegarPara(secaoId) {
     const secao = document.getElementById(secaoId);
+
+    atualizarSecaoAtiva(secaoId);
+
     if (secao) {
         secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        secao.focus({ preventScroll: true });
     }
 
     document.getElementById('sidebar')?.classList.remove('open');
 }
 
+function irParaSecao(secaoId) {
+    navegarPara(secaoId);
+}
+
+function acaoRapidaAdicionar() {
+    const formBody = document.getElementById('form-body');
+    const btnToggle = document.getElementById('btn-toggle-form');
+
+    irParaSecao('sec-cadastro');
+
+    if (formBody?.classList.contains('collapsed')) {
+        toggleFormCadastro();
+    }
+
+    if (btnToggle) {
+        btnToggle.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    setTimeout(() => {
+        document.getElementById('produto-base')?.focus();
+    }, 120);
+}
+
+function acaoRapidaInventario() {
+    irParaSecao('sec-estoque');
+    document.getElementById('input-busca')?.focus();
+}
+
+function acaoRapidaCriticos() {
+    const selectStatus = document.getElementById('filtro-status');
+    if (selectStatus) {
+        selectStatus.value = 'critico';
+    }
+
+    categoriaAtual = 'todos';
+    salvarDados();
+    irParaSecao('sec-estoque');
+    renderizarTabela();
+    mostrarToast('Filtro aplicado: somente itens críticos.', 'warning', 2800);
+}
+
 function alternarTema() {
-    const atual = document.documentElement.getAttribute('data-theme') || 'light';
+    const atual = document.documentElement.getAttribute('data-theme') || 'dark';
     const novo = atual === 'dark' ? 'light' : 'dark';
     const icon = document.querySelector('#btn-theme-toggle .icon');
 
@@ -789,6 +1361,7 @@ function alternarTema() {
 
 function bindEventos() {
     document.getElementById('btn-theme-toggle')?.addEventListener('click', alternarTema);
+    document.getElementById('btn-notifications')?.addEventListener('click', verificarCriticos);
     document.getElementById('btn-export')?.addEventListener('click', exportarDados);
     document.getElementById('btn-import')?.addEventListener('click', () => {
         document.getElementById('import-file')?.click();
@@ -806,9 +1379,23 @@ function bindEventos() {
     });
 
     document.getElementById('btn-toggle-form')?.addEventListener('click', toggleFormCadastro);
+    document.getElementById('btn-limpar-filtros')?.addEventListener('click', limparFiltros);
+
+    document.getElementById('btn-intro-purchases')?.addEventListener('click', acaoRapidaCriticos);
+    document.getElementById('btn-intro-inventory')?.addEventListener('click', () => irParaSecao('sec-estoque'));
+    document.getElementById('btn-intro-add')?.addEventListener('click', () => irParaSecao('sec-cadastro'));
+
+    document.getElementById('btn-quick-add')?.addEventListener('click', acaoRapidaAdicionar);
+    document.getElementById('btn-quick-inventory')?.addEventListener('click', acaoRapidaInventario);
+    document.getElementById('btn-quick-critical')?.addEventListener('click', acaoRapidaCriticos);
+    document.getElementById('btn-open-purchases-section')?.addEventListener('click', () => irParaSecao('sec-compras'));
+    document.getElementById('btn-ir-inventario')?.addEventListener('click', () => irParaSecao('sec-estoque'));
+    document.getElementById('btn-exportar-csv-lista')?.addEventListener('click', exportarCSVSugeridos);
+
+    document.getElementById('btn-export-csv')?.addEventListener('click', exportarCSVInventario);
 
     document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.addEventListener('click', () => navegarPara(btn.dataset.target, btn));
+        btn.addEventListener('click', () => navegarPara(btn.dataset.target));
     });
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -820,6 +1407,9 @@ function bindEventos() {
     });
 
     document.getElementById('input-busca')?.addEventListener('input', renderizarTabela);
+    document.getElementById('filtro-status')?.addEventListener('change', renderizarTabela);
+    document.getElementById('filtro-estoque-min')?.addEventListener('input', renderizarTabela);
+    document.getElementById('filtro-estoque-max')?.addEventListener('input', renderizarTabela);
     document.getElementById('produto-base')?.addEventListener('change', atualizarPreviewProduto);
 
     document.getElementById('qtd-pacotes')?.addEventListener('input', calcularModal);
@@ -904,7 +1494,7 @@ function bindEventos() {
 }
 
 function aplicarTemaInicial() {
-    const temaSalvo = localStorage.getItem(STORAGE_KEYS.tema) || 'light';
+    const temaSalvo = localStorage.getItem(STORAGE_KEYS.tema) || 'dark';
     const icon = document.querySelector('#btn-theme-toggle .icon');
 
     document.documentElement.setAttribute('data-theme', temaSalvo);
@@ -916,11 +1506,15 @@ function aplicarTemaInicial() {
 function init() {
     aplicarTemaInicial();
     carregarDados();
+    atualizarSecaoAtiva(secaoAtiva);
     renderizarCatalogoSelect();
     bindEventos();
     renderizarTabela();
     renderizarHistorico();
     verificarCriticos();
+
+    const footerAno = document.getElementById('footer-ano');
+    if (footerAno) footerAno.textContent = String(new Date().getFullYear());
 }
 
 document.addEventListener('DOMContentLoaded', init);

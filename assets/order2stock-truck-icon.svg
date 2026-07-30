@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 48 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Order2Stock">
+    <defs>
+        <linearGradient id="truckCyan" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#67e8f9" />
+            <stop offset="1" stop-color="#22d3ee" />
+        </linearGradient>
+    </defs>
+    <g fill="none" stroke="url(#truckCyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 22V9a1 1 0 0 1 1-1h20a1 1 0 0 1 1 1v13" />
+        <path d="M24 14h9l6 6v2h-3" />
+        <path d="M2 22h1" />
+        <path d="M27 22h-3" />
+        <path d="M14 24h17" />
+        <circle cx="11" cy="24" r="3" />
+        <circle cx="34" cy="24" r="3" />
+    </g>
+</svg>
