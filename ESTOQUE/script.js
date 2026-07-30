@@ -208,8 +208,12 @@ function carregarDados() {
             ? JSON.parse(historicoSalvo)
             : [];
 
-        categoriaAtual = localStorage.getItem(STORAGE_KEYS.categoria) || 'todos';
-        secaoAtiva = localStorage.getItem(STORAGE_KEYS.secao) || 'sec-dashboard';
+        // Mantem abertura consistente no painel principal em qualquer dispositivo.
+        categoriaAtual = 'todos';
+        secaoAtiva = 'sec-dashboard';
+
+        localStorage.setItem(STORAGE_KEYS.categoria, categoriaAtual);
+        localStorage.setItem(STORAGE_KEYS.secao, secaoAtiva);
 
         if (!catalogoSalvo) {
             salvarDados();
