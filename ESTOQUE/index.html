@@ -241,6 +241,7 @@
                         </div>
 
                         <div class="section-actions-inline">
+                            <button class="btn-secondary btn-back-home" type="button" data-go-dashboard="true">Voltar ao dashboard</button>
                             <button class="btn-secondary" id="btn-ir-inventario" type="button">Ver inventário</button>
                             <button class="btn-primary" id="btn-exportar-csv-lista" type="button">Exportar CSV</button>
                         </div>
@@ -288,10 +289,13 @@
                         <p>O produto vem do catálogo. A contagem é feita depois no botão de relógio.</p>
                     </div>
 
-                    <button id="btn-toggle-form" class="btn-secondary" type="button" aria-expanded="false" aria-controls="form-body">
-                        <span class="form-toggle-icon" aria-hidden="true">▶</span>
-                        <span class="form-toggle-label">Mostrar formulário</span>
-                    </button>
+                    <div class="section-actions-inline">
+                        <button class="btn-secondary btn-back-home" type="button" data-go-dashboard="true">Voltar ao dashboard</button>
+                        <button id="btn-toggle-form" class="btn-secondary" type="button" aria-expanded="false" aria-controls="form-body">
+                            <span class="form-toggle-icon" aria-hidden="true">▶</span>
+                            <span class="form-toggle-label">Mostrar formulário</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="form-body" class="form-body collapsed">
@@ -321,6 +325,10 @@
 
             <section id="sec-estoque" class="app-section animate-on-load" tabindex="-1">
                 <div class="card search-filter-container">
+                    <div class="section-actions-inline inventory-actions-inline">
+                        <button class="btn-secondary btn-back-home" type="button" data-go-dashboard="true">Voltar ao dashboard</button>
+                    </div>
+
                     <div class="search-box">
                         <label class="sr-only" for="input-busca">Buscar produto</label>
                         <input id="input-busca" type="search" placeholder="Buscar por nome..." />
@@ -382,7 +390,10 @@
                         <p>Rastreio das alterações realizadas.</p>
                     </div>
 
-                    <button class="btn-secondary" id="btn-limpar-historico" type="button">Limpar histórico</button>
+                    <div class="section-actions-inline">
+                        <button class="btn-secondary btn-back-home" type="button" data-go-dashboard="true">Voltar ao dashboard</button>
+                        <button class="btn-secondary" id="btn-limpar-historico" type="button">Limpar histórico</button>
+                    </div>
                 </div>
 
                 <div class="table-container">

@@ -1398,6 +1398,10 @@ function bindEventos() {
 
     document.getElementById('btn-export-csv')?.addEventListener('click', exportarCSVInventario);
 
+    document.querySelectorAll('[data-go-dashboard="true"]').forEach(btn => {
+        btn.addEventListener('click', () => irParaSecao('sec-dashboard'));
+    });
+
     document.querySelectorAll('.nav-item').forEach(btn => {
         btn.addEventListener('click', () => navegarPara(btn.dataset.target));
     });
