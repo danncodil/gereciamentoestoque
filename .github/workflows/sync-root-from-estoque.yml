@@ -1,0 +1,42 @@
+name: Sync root from ESTOQUE
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ESTOQUE/**
+      - .github/workflows/sync-root-from-estoque.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-root:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync files to repository root
+        run: |
+          cp ESTOQUE/index.html index.html
+          cp ESTOQUE/style.css style.css
+          cp ESTOQUE/script.js script.js
+          cp ESTOQUE/README.md README.md
+          mkdir -p assets
+          rsync -a --delete ESTOQUE/assets/ assets/
+
+      - name: Commit and push when needed
+        run: |
+          if git diff --quiet; then
+            echo "No sync changes detected"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md index.html style.css script.js assets
+          git commit -m "chore: sincroniza raiz automaticamente"
+          git push
