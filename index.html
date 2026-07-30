@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meu Estoque Inteligente</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar" aria-label="Menu lateral">
+            <div class="sidebar-top">
+                <button class="sidebar-close" id="btn-close-sidebar" type="button" aria-label="Fechar menu">✕</button>
+
+                <div class="sidebar-brand">
+                    <div class="brand-icon" aria-hidden="true">📦</div>
+                    <div>
+                        <h2>Meu Estoque<br />Inteligente</h2>
+                        <p>Catálogo base + inventário do zero</p>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav" aria-label="Navegação principal">
+                    <button class="nav-item active" type="button" data-target="sec-dashboard">📊 Dashboard</button>
+                    <button class="nav-item" type="button" data-target="sec-cadastro">➕ Adicionar item</button>
+                    <button class="nav-item" type="button" data-target="sec-estoque">📋 Inventário</button>
+                    <button class="nav-item" type="button" data-target="sec-historico">🕘 Histórico</button>
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="btn-export" id="btn-export" type="button">⬇️ Exportar JSON</button>
+                <button class="btn-import" id="btn-import" type="button">⬆️ Importar JSON</button>
+                <input id="import-file" type="file" accept=".json,application/json" hidden />
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header animate-on-load">
+                <div>
+                    <h1>Controle de Estoque</h1>
+                    <p>Selecione o produto do catálogo, conte caixas e unidades, e o sistema calcula o restante.</p>
+                </div>
+
+                <div class="header-actions">
+                    <button class="hamburger" id="btn-open-sidebar" type="button" aria-label="Abrir menu">☰</button>
+                    <button class="theme-toggle-btn" id="btn-theme-toggle" type="button" aria-label="Alternar tema">
+                        <span class="icon" aria-hidden="true">🌙</span>
+                    </button>
+                </div>
+            </header>
+
+            <section id="sec-dashboard" class="animate-on-load">
+                <div class="stats-grid">
+                    <article class="stat-card">
+                        <span class="stat-label">Itens no inventário</span>
+                        <strong class="stat-value" id="stat-total">0</strong>
+                    </article>
+
+                    <article class="stat-card">
+                        <span class="stat-label">Itens em baixo estoque</span>
+                        <strong class="stat-value text-alert" id="stat-baixo">0</strong>
+                    </article>
+
+                    <article class="stat-card">
+                        <span class="stat-label">Produtos no catálogo</span>
+                        <strong class="stat-value-time" id="stat-catalogo">0</strong>
+                    </article>
+                </div>
+
+                <div class="card category-summary" id="category-summary" aria-label="Resumo por categoria"></div>
+            </section>
+
+            <section id="sec-cadastro" class="card animate-on-load">
+                <div class="form-header">
+                    <div>
+                        <h2>Adicionar produto ao inventário</h2>
+                        <p>O produto vem do catálogo. A contagem é feita depois no botão de relógio.</p>
+                    </div>
+
+                    <button id="btn-toggle-form" class="btn-secondary" type="button" aria-expanded="false" aria-controls="form-body">
+                        <span class="form-toggle-icon" aria-hidden="true">▶</span>
+                        <span class="form-toggle-label">Mostrar formulário</span>
+                    </button>
+                </div>
+
+                <div id="form-body" class="form-body collapsed">
+                    <form id="form-estoque">
+                        <div class="form-grid form-grid-catalogo">
+                            <div class="form-group">
+                                <label for="produto-base">Produto do catálogo</label>
+                                <select id="produto-base" required></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="min">Estoque mínimo</label>
+                                <input id="min" name="min" type="number" min="0" step="0.01" required />
+                            </div>
+                        </div>
+
+                        <div id="produto-preview" class="product-preview" aria-live="polite">
+                            <strong>Catálogo base:</strong> selecione um produto para ver quantidade por caixa, unidade, total por caixa e peso.
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="btn-primary" type="submit">Adicionar ao inventário</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section id="sec-estoque" class="animate-on-load">
+                <div class="card search-filter-container">
+                    <div class="search-box">
+                        <label class="sr-only" for="input-busca">Buscar produto</label>
+                        <input id="input-busca" type="search" placeholder="Buscar por nome..." />
+                    </div>
+
+                    <div class="category-tabs" id="category-tabs" aria-label="Filtro por categoria">
+                        <button class="tab-btn active" type="button" data-category="todos">Todos</button>
+                        <button class="tab-btn" type="button" data-category="congelados">🧊 Congelados</button>
+                        <button class="tab-btn" type="button" data-category="resfriados">🧃 Resfriados</button>
+                        <button class="tab-btn" type="button" data-category="secos">🥫 Secos</button>
+                        <button class="tab-btn" type="button" data-category="brindes">🎁 Brindes</button>
+                        <button class="tab-btn" type="button" data-category="embalagens">📦 Embalagens</button>
+                        <button class="tab-btn" type="button" data-category="limpeza">🧽 Limpeza</button>
+                        <button class="tab-btn" type="button" data-category="uniformes">👕 Uniformes</button>
+                        <button class="tab-btn" type="button" data-category="consumo">🛠️ Uso/Consumo</button>
+                    </div>
+                </div>
+
+                <div class="card table-container">
+                    <div class="table-controls">
+                        <span class="table-count" id="table-count">Mostrando 0 produtos</span>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="nome" scope="col">Produto</th>
+                                <th scope="col">Embalagem</th>
+                                <th scope="col">Contagem</th>
+                                <th class="sortable" data-sort="estoque" scope="col">Total calculado</th>
+                                <th scope="col">Peso aprox.</th>
+                                <th class="sortable" data-sort="status" scope="col">Status</th>
+                                <th scope="col" class="text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-estoque"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="sec-historico" class="card animate-on-load">
+                <div class="form-header">
+                    <div>
+                        <h2>Histórico</h2>
+                        <p>Rastreio das alterações realizadas.</p>
+                    </div>
+
+                    <button class="btn-secondary" id="btn-limpar-historico" type="button">Limpar histórico</button>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Data</th>
+                                <th scope="col">Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-historico"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="modal-contagem" aria-hidden="true">
+        <div class="card modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+            <div class="modal-header">
+                <h2 id="modal-titulo">Contagem</h2>
+                <button class="btn-close" type="button" id="btn-fechar-modal" aria-label="Fechar contagem">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <p id="modal-pacote-info" class="modal-info"></p>
+
+                <div class="form-grid modal-grid">
+                    <div class="form-group">
+                        <label for="qtd-pacotes">Caixas fechadas</label>
+                        <input id="qtd-pacotes" type="number" min="0" step="1" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="qtd-soltas">Unidades avulsas</label>
+                        <input id="qtd-soltas" type="number" min="0" step="1" />
+                    </div>
+                </div>
+
+                <p id="modal-unidade-texto" class="modal-subinfo"></p>
+                <p id="equivalencia-info" class="modal-subinfo"></p>
+                <div id="modal-decomposicao" class="modal-subinfo"></div>
+
+                <div class="modal-total-box">
+                    <span>Total calculado</span>
+                    <strong><span id="modal-total-calc">0</span> <span id="modal-un-final">UN</span></strong>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-secondary" id="btn-cancelar-contagem" type="button">Cancelar</button>
+                    <button class="btn-primary" id="btn-salvar-contagem" type="button">Salvar contagem</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-edicao" aria-hidden="true">
+        <div class="card modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-edicao-titulo">
+            <div class="modal-header">
+                <h2 id="modal-edicao-titulo">Editar item</h2>
+                <button class="btn-close" type="button" id="btn-fechar-edicao" aria-label="Fechar edição">✕</button>
+            </div>
+
+            <form id="form-edicao" class="modal-body">
+                <div class="form-grid modal-grid">
+                    <div class="form-group">
+                        <label for="edit-nome">Produto</label>
+                        <input id="edit-nome" type="text" readonly />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-embalagem">Embalagem</label>
+                        <input id="edit-embalagem" type="text" readonly />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-peso-caixa">Peso por caixa</label>
+                        <input id="edit-peso-caixa" type="text" readonly />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-min">Estoque mínimo</label>
+                        <input id="edit-min" type="number" min="0" step="0.01" required />
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-secondary" type="button" id="btn-cancelar-edicao">Cancelar</button>
+                    <button class="btn-primary" type="submit">Salvar alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
